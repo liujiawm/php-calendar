@@ -243,21 +243,13 @@ class Calendar
      * @return array
      */
     private function loadConfig(string $name='default'):array{
-        if(class_exists('\think\Config')){
-            $this->config = \think\Config::get('calendar.default');
-            if ($name !== 'default' && \think\Config::has('calendar.'.$name)){
-                $currentConfig = \think\Config::get('calendar.'.$name);
-                $this->config = array_merge($this->config, array_change_key_case($currentConfig));
-            }
-        }else{
-            $configFile = __DIR__ . DIRECTORY_SEPARATOR . 'config.php';
-            if (is_file($configFile)) {
-                $con = include $configFile;
-                if (is_array($con)){
-                    $this->config = $con['default'];
-                    if ($name !== 'default' && isset($con[$name])){
-                        $this->config = array_merge($this->config, array_change_key_case($con[$name]));
-                    }
+        $configFile = __DIR__ . DIRECTORY_SEPARATOR . 'config.php';
+        if (is_file($configFile)) {
+            $con = include $configFile;
+            if (is_array($con)){
+                $this->config = $con['default'];
+                if ($name !== 'default' && isset($con[$name])){
+                    $this->config = array_merge($this->config, array_change_key_case($con[$name]));
                 }
             }
         }

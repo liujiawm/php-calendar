@@ -1,5 +1,6 @@
 {
 	"name" : "phpu/calendar",
+	"description" : "a php calendar api 一个用php写的日历",
 	"keywords" : [
 		"calendar",
 		"julian day",

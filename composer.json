@@ -1,0 +1,39 @@
+{
+	"name" : "phpu/calendar",
+	"keywords" : [
+		"calendar",
+		"julian day",
+		"gregorian",
+		"lunar",
+		"chinese calendar",
+		"solar terms",
+		"heavenly stems",
+		"earthly branches",
+		"earthly branches",
+		"symbolic_animals",
+		"zodiac"
+	],
+	"authors": [
+	{
+		"name": "liujiawm",
+		"email": "liujiawm@163.com",
+		"homepage": "https://liujiawm.github.io/"
+	}
+	],
+	"autoload" : {
+		"psr-4" : {
+			"phpu\\calendar\\" : "src"
+		}
+	},
+	"license" : "Apache-2.0",
+	"require" : {
+		"php" : ">=7.1"
+    },
+	"extra": {
+		"think": {
+			"config":{
+				"calendar": "src/config.php"
+			}
+		}
+	}
+}

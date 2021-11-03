@@ -1,4 +1,7 @@
 <?php
+/**
+ * 一个日历，有节气、农历、干支
+ */
 declare(strict_types=1);
 
 namespace phpu\calendar;
@@ -11,11 +14,14 @@ use DatePeriod;
 
 class Calendar
 {
-
     // 日历显示
-    public const GRIDo_MONTH = 0; // 显示一个月的日历
-    public const GRIDo_WEEK  = 1; // 显示一周的日历
-    public const GRIDo_DAY   = 2; // 显示一天的日历
+    public const GRIDO_MONTH = 0; // 显示一个月的日历
+    public const GRIDO_WEEK  = 1; // 显示一周的日历
+    public const GRIDO_DAY   = 2; // 显示一天的日历
+
+    public const GRIDo_MONTH = self::GRIDO_MONTH; // Deprecated: Use GRIDO_MONTH instead
+    public const GRIDo_WEEK  = self::GRIDO_WEEK;  // Deprecated: Use GRIDO_WEEK instead
+    public const GRIDo_DAY   = self::GRIDO_DAY;   // Deprecated: Use GRIDO_DAY instead
 
 
     /**
@@ -24,18 +30,33 @@ class Calendar
      *
      * @var DateTimeZone|null
      */
-    private $timezone = null;
+    private $timezone = null; // 默认中国上海时区
 
     /**
      * 默认配置，该项是在读取config.php出错的情况下使用该默认值
      *
      * @var array
      */
-    private $config = ['grid' => Calendar::GRIDo_MONTH,
+    private $config = [
+        // 读取日历长度
+        // 0 GRIDo_MONTH 一个月
+        // 1 GRIDo_WEEK 一周
+        // 2 GRIDo_DAY 一天
+        'grid' => self::GRIDO_MONTH,
+
+        // 读取节气
         'solar_terms'       => true,
+
+        // 读取农历
         'lunar'             => true,
+
+        // 读取干支
         'heavenly_earthly'  => true,
+
+        // 区分早晚子时，true则 23:00-24:00 00:00-01:00为子时，否则00:00-02:00为子时
         'night_zi_hour'     => false,
+
+        // 日历显示时第一列显示周几，(日历表第一列是周几,0周日,依次最大值6)
         'first_day_of_week' => 0
     ];
 
@@ -43,13 +64,12 @@ class Calendar
     /**
      * Calendar constructor.
      * @param DateTimeZone|null $timezone
-     * @param string $configname 配置项
+     * @param string $configname 配置名称
      */
     public function __construct(DateTimeZone $timezone=null, string $configname = 'default'){
         $this->timezone = $timezone;
         // 获取配置
         $this->loadConfig($configname);
-
     }
 
     /**
@@ -69,22 +89,44 @@ class Calendar
         return $this;
     }
 
+    /**
+     * 定议该日历当前日期的DateTimeZone
+     * @param string $timezone
+     *
+     * @return $this
+     */
+    public function setZone(string $timezone){
+        $this->timezone = new DateTimeZone($timezone);
+        return $this;
+    }
+
+    /**
+     * 返回该日历当前日期所使用的DateTimeZone
+     * @return DateTimeZone
+     */
+    public function getZone():DateTimeZone{
+        return $this->timezone;
+    }
 
 
     /**
      * 整个日历数据
+     *
      * @param int $y 指定的年，-1000至3000
      * @param int $m 指定的月，1至12
      * @param int $d 指定的日，默认0
      * @param int $h 指定时间，默认 -1
-     * @return array|false
+     *
+     * @return array
+     * @throws Exception
      */
-    public function getCalendar(int $y,int $m,int $d=0,int $h=-1){
+    public function getCalendar(int $y,int $m,int $d=0,int $h=-1):array
+    {
         if($y < -1000 || $y > 3000 || $m< 1 || $m > 12){
-            return false;
+            throw new Exception('Date not allowed');
         }
         $currentDt = $this->now();
-        list($currentY,$currentM,$currentD,$currentH,$currentI,$currentS,$currentW)
+        [$currentY,$currentM,$currentD,$currentH,$currentI,$currentS,$currentW]
             = array_map(function($v){return intval($v,10);}, explode(',',$currentDt->format('Y,n,j,G,i,s,w')));
         if($d === 0){
             // 未指定日，默认为1日
@@ -100,9 +142,9 @@ class Calendar
             $h = $currentH;
         }
 
-
         // 新建一个 DateTime
-        $newDt = $this->newDateTime(sprintf('%04.0f-%02.0f-%02.0f %02.0f:%02.0f:%02.0f', $y, $m, $d, $h, $currentI, $currentS));
+        //$newDt = $this->stringToDateTime(sprintf('%04.0f-%02.0f-%02.0f %02.0f:%02.0f:%02.0f', $y, $m, $d, $h, $currentI, $currentS));
+        $newDt = $this->newDateTime($y, $m, $d, $h, $currentI, $currentS);
 
         return [
             'y' => $y,
@@ -119,33 +161,56 @@ class Calendar
      * 以字符串新建一个DateTime
      *
      * @param string $timeStr 字符串格式与DateTime构造时所需相同，参考 https://php.net/manual/en/datetime.formats.php
-     * @return DateTime|false
+     *
+     * @return DateTime
+     * @throws Exception
      */
-    private function newDateTime(string $timeStr){
-        try {
-            return new DateTime($timeStr, $this->timezone);
-        } catch (Exception $e) {
-            return false;
-        }
+    private function stringToDateTime(string $timeStr):DateTime
+    {
+        return new DateTime($timeStr, $this->timezone);
+    }
+
+    /**
+     * @param int $y 年
+     * @param int $m 月
+     * @param int $d 日
+     * @param int $h 时
+     * @param int $i 分
+     * @param int $s 秒
+     *
+     * @return DateTime
+     * @throws Exception
+     */
+    private function newDateTime(int $y, int $m, int $d, int $h, int $i, int $s):DateTime
+    {
+        return $this->now()->setDate($y, $m, $d)->setTime($h,$i,$s);
     }
 
     /**
      * 当前时间的 DateTime 对象
+     *
      * @return DateTime
+     * @throws Exception
      */
-    private function now():DateTime{
-        return $this->newDateTime('now');
+    private function now():DateTime
+    {
+        return $this->stringToDateTime('now');
     }
 
 
     /**
      * 取日期数据
+     *
      * @param DateTime $dt
+     *
      * @return array
+     * @throws Exception
      */
     private function days(DateTime $dt){
 
-        list($y,$m,$d,$h,$i,$s,$w)
+        $dtClone = clone $dt;
+
+        [$y,$m,$d,$h,$i,$s,$w]
             = array_map(function($v){return intval($v,10);}, explode(',',$dt->format('Y,n,j,G,i,s,w')));
 
         // 取当年节气
@@ -154,17 +219,13 @@ class Calendar
             $yearSolarTerms = Date::solarTerms($dt);
         }
 
-        $dtClone = clone $dt;
-
-
         $grid = $this->config['grid'];
-
         // 按周或月取日期
-        if($grid === self::GRIDo_WEEK || $grid === self::GRIDo_MONTH){
+        if($grid === self::GRIDO_WEEK || $grid === self::GRIDO_MONTH){
 
             $recurrences = 0;
 
-            if ($grid === self::GRIDo_WEEK){
+            if ($grid === self::GRIDO_WEEK){
                 $recurrences = 6; // 循环6次,取7天(含开始日期)
             }else{
                 $recurrences = 41; // 循环41次,取42天(含开始日期)
@@ -202,7 +263,7 @@ class Calendar
         $resultDate = [];
         foreach($dateRange as $date){
             $DateFormat = $date->format('Y,n,j,G,i,s,w');
-            list($y,$m,$d,$h,$i,$s,$w) = explode(',',$DateFormat,7);
+            [$y,$m,$d,$h,$i,$s,$w] = explode(',',$DateFormat,7);
             $key = $y.'-'.$m.'-'.$d;
             $resultDate[$key]['gregorian'] = [
                 'y' => (int)$y,
@@ -232,10 +293,6 @@ class Calendar
 
         return $resultDate;
     }
-
-
-
-
 
     /**
      * 获取配置

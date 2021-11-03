@@ -50,6 +50,8 @@ namespace phpu\calendar;
 use Exception;
 use DateTime;
 use DateInterval;
+use DateTimeZone;
+use InvalidArgumentException;
 
 class Date
 {
@@ -76,43 +78,49 @@ class Date
 
     /**
      * 格里历日期转儒略日
-     * @param DateTime $dt 要转化的日期时间，参数为DateTime对象
+     *
+     * (为了简便计算，1582年10月15日之前按儒略历方式计算,
+     * 也就是说在儒略历中不存在的1582年10月5日-1582年10月14日这十天的儒略日是不正确的,
+     * 正确的做法是判断日期在这十天内则不计算儒略历,该方法不做判断)
+     *
+     * @param DateTime $dt 要转化的日期时间，以中午12点分隔
      * @param bool $mjd 是否使用简化儒略日 1858年11月17日0时开始
-     * @return float|false 1582年10月5日-14日在格里历中不存在返回false
+     *
+     * @return float 儒略日
      */
-    public static function gregorianToJD (DateTime $dt, bool $mjd = false){
-
+    public static function gregorianToJD (DateTime $dt, bool $mjd = false):float
+    {
         $YnjGis = $dt->format('Y,n,j,G,i,s');
         if(false === $YnjGis){
-            $YnjGis = '-4712,1,1,12,0,0';
+            $YnjGis = '1582,10,15,12,0,0';
         }
-        list($y,$m,$d,$h,$i,$s) = array_map(function($v){return floatval($v);}, explode(',',$YnjGis,6));
+        [$Y,$M,$D,$H,$I,$S] = array_map('floatval', explode(',',$YnjGis,6));
 
-        // 计算JDN
-        $a = floor((14-$m)/12);
-        $_y = $y + 4800 - $a;
-        $_m = $m + 12 * $a -3;
-        $_d = $d + $h / 24.0 + $i / 1440.0 + $s / 86400.0;
+        // 计算儒略日开始
+
+        $a = floor((14-$M)/12); // 因计算公式需月份大于2
+
+        $y = $Y + 4800 - $a;
+        $m = $M + 12 * $a -3;
+        $d = $D + $H / 24.0 + $I / 1440.0 + $S / 86400.0;
         // 公式 https://blog.csdn.net/weixin_42763614/article/details/82880007
         $jdn = (float)0;
-        if((($y > 1582) || ($y == 1582 && $m > 10) || ($y == 1582 && $m == 10 && $d >= 15))){
-            // 适用于格里历日期(中午)
-            $jdn = $_d + floor((153 * $_m + 2) / 5) + 365 * $_y + floor($_y / 4)
-                - floor($_y / 100) + floor($_y / 400)-32045;
-        }else if(($y<1582) || ($y==1582 && $m<10) || ($y==1582 && $m==10 && $d<=4)){
-            // 适用于儒略历日期(中午)
-            $jdn = $_d + floor((153 * $_m + 2) / 5) + 365 * $_y + floor($_y / 4)
-                - 32083;
+        if(($Y<1582) || ($Y==1582 && $M<10) || ($Y==1582 && $M==10 && $D<15)){
+            // 适用于儒略历日期(中午12点)
+            $jdn = $d + floor((153 * $m + 2) / 5) + 365 * $y + floor($y / 4) - 32083;
         }else{
-            // 1582年10月5日-14日在格里历中不存在
-            return false;
+            // 适用于格里历日期(中午12点)
+            $jdn = $d + floor((153 * $m + 2) / 5) + 365 * $y + floor($y / 4) - floor($y / 100) + floor($y / 400)-32045;
+
+            // 在php语言中，有Calendar扩展库，该库中有GregorianToJD函数可以代替上面的公式计算用格里历的儒略日,不同之处是0时分隔
+            // $jdn = GregorianToJD((int)$M,(int)$D,(int)$Y) + 0.5;
         }
 
         $jd = $jdn - 0.5;
-
+        // 计算儒略日结束
 
         // 简化儒略日
-        if($mjd){
+        if($mjd && ($Y > 1858 || ($Y==1858 && $M>11) || ($Y==1858 && $M==11 && $D>=17) )){
             $jd -= 2400000.5;
         }
 
@@ -121,26 +129,34 @@ class Date
 
     /**
      * 儒略日转格里日历日期时间
-     * @param float $jd
-     * @param string|null $timeZone
-     * @return DateTime|false
+     *
+     * @param float             $jd 儒略日
+     * @param DateTimeZone|null $timeZone
+     *
+     * @return DateTime
+     * @throws Exception
      */
-    public static function jdToGregorian(float $jd, string $timeZone=null){
+    public static function jdToGregorian(float $jd, DateTimeZone $timeZone=null):DateTime
+    {
 
-        $jd += 0.5;
-        $Z = floor($jd);
-        $F = $jd - $Z;
+        $jdn = $jd + 0.5;
 
-        $A = $Z; // 儒略历
+        // 公式 https://blog.csdn.net/weixin_42763614/article/details/82880007
+        $Z = floor($jdn); // 儒略日的整数部分,即为所求日到-4712年1月1日0时的日数
+        $F = $jdn - $Z; // 儒略日的小数部分
 
+        $A = (float)0;
         // 2299161 是1582年10月15日12时0分0秒
-        if($Z >= 2299161){
+        if($Z < 2299161){
+            //儒略历
+            $A = $Z;
+        }else{
             // 格里历
             $a = floor(($Z - 2305447.5) / 36524.25);
             $A = $Z + 10 + $a - floor($a/4);
         }
 
-        $_day = (float)1;
+        $dayLi = (float)1;
         $E = (float)0;
         $k = 0;
         while (true){
@@ -148,20 +164,20 @@ class Date
             $C = floor(($B - 122.1) / 365.25); // 积年
             $D = floor(365.25 * $C); // 积年的日数
             $E = floor(($B - $D) / 30.6); // B-D为年内积日，E即月数
-            $_day = $B - $D - floor(30.6 * $E) + $F;
-            if($_day >= 1) break; // 否则即在上一月，可前置一日重新计算
+            $dayLi = $B - $D - floor(30.6 * $E) + $F;
+            if($dayLi >= 1) break; // 否则即在上一月，可前置一日重新计算
             $A -= 1;
             $k += 1;
         }
 
         $month = $E < 14 ? $E - 1 : $E - 13;
         $year = $month > 2 ? $C - 4716 : $C - 4715;
-        $_day += $k;
-        if(intval($_day,10) === 0) $_day = 1;
+        $dayLi += $k;
+        if(intval($dayLi,10) === 0) $dayLi += 1;
 
         // 天数分开成天与时分秒
-        $day = floor($_day);
-        $dayF = $_day - $day;
+        $day = floor($dayLi);
+        $dayF = $dayLi - $day;
         $hh = $ii = $ss = (float)0;
         if($dayF > 0){
             $sd = $dayF * 24 * 60 * 60 + 0.00005; // 考虑精度，0.00005
@@ -171,16 +187,7 @@ class Date
             $hh = floor($mt / 60);
         }
 
-        // return sprintf('%04.0f-%02.0f-%02.0f %02.0f:%02.0f:%02.0f',$year,$month,$day,$hh,$ii,$ss);
-
-        try {
-            return new DateTime(
-                sprintf('%04.0f-%02.0f-%02.0f %02.0f:%02.0f:%02.0f', $year, $month, $day, $hh, $ii, $ss)
-                , $timeZone
-            );
-        } catch (Exception $e) {
-            return false;
-        }
+        return new DateTime(sprintf('%04.0f-%02.0f-%02.0f %02.0f:%02.0f:%02.0f', $year, $month, $day, $hh, $ii, $ss), $timeZone);
     }
 
     /**
@@ -189,7 +196,8 @@ class Date
      * @param float $jd 儒略日
      * @return float 返回某时刻(儒略日)的摄动偏移量
      */
-    public static function perturbation(float $jd):float {
+    public static function perturbation(float $jd):float
+    {
         $ptsa = [485, 203, 199, 182, 156, 136, 77, 74, 70, 58, 52, 50, 45, 44, 29, 18, 17, 16, 14, 12, 12, 12, 9, 8];
         $ptsb = [324.96, 337.23, 342.08, 27.85, 73.14, 171.52, 222.54, 296.72, 243.58, 119.81, 297.17, 21.02, 247.54,
             325.15,60.93, 155.12, 288.79, 198.04, 199.76, 95.39, 287.11, 320.81, 227.73, 15.45];
@@ -334,41 +342,42 @@ class Date
      * 两个春分点之间为一个回归年长
      *
      * @param DateTime $dt
-     * @return false|float 春分点的jd值
+     *
+     * @return float 春分点的jd值
+     * @throws Exception
      */
-    public static function vernalEquinox(DateTime $dt) {
+    public static function vernalEquinox(DateTime $dt):float {
 
-        $Y = $dt->format('Y');
-        if(false === $Y) return false;
-        $yy = floatval($Y);
+        $yy = floatval($dt->format('Y'));
+
+        if($yy > 8001 || $yy < -8000){
+            throw new Exception('Date not allowed');
+        }
 
         if ($yy >= 1000 && $yy <= 8001) {
             $m = ($yy - 2000) / 1000;
             return 2451623.80984 + 365242.37404 * $m + 0.05169 * pow($m,2) - 0.00411 * pow($m,3) - 0.00057 * pow($m,4);
-        }
-        if ($yy >= -8000 && $yy < 1000) {
+        }else{
             $m = $yy / 1000;
             return 1721139.29189 + 365242.1374 * $m + 0.06134 * pow($m,2) + 0.00111 * pow($m,3) - 0.00071 * pow($m,4);
         }
-
-        return false;
     }
 
     /**
      * 获取指定年的春分开始的24节气,另外多取2个确保覆盖完一个公历年
      *
      * @param DateTime $dt
-     * @return array<float>|false 节气的儒略日
+     *
+     * @return array<float> 节气的儒略日
+     * @throws Exception
      */
-    public static function meanSolarTermsJD(DateTime $dt){
-        $dtClone = clone $dt;
+    public static function meanSolarTermsJD(DateTime $dt):array
+    {
+        $dtClone = clone $dt; // copy DateTime
         // 该年的春分點
-        if(! $jdve = self::vernalEquinox($dt)){
-            return false;
-        }
-        $Y = $dt->format('Y');
-        if(false === $Y) return false;
-        $yy = floatval($Y);
+        $jdve = self::vernalEquinox($dt);
+
+        $yy = floatval($dt->format('Y'));
 
         $ty = self::vernalEquinox($dtClone->add(new DateInterval('P1Y'))) - $jdve; // 该年的回归年长
 
@@ -427,17 +436,20 @@ class Date
      * 获取指定年的春分开始作perturbation调整后的24节气,可以多取2个
      *
      * @param DateTime $dt
-     * @param int $start 开始索引(春分开始的节气索引 0-25)
-     * @param int $end 结束索引(春分开始的节气索引 0-25)
-     * @return array|false
+     * @param int      $start 开始索引(春分开始的节气索引 0-25)
+     * @param int      $end   结束索引(春分开始的节气索引 0-25)
+     *
+     * @return float[]
+     * @throws Exception
      */
-    public static function adjustedSolarTerms(DateTime $dt, int $start=0, int $end=25) {
+    public static function adjustedSolarTerms(DateTime $dt, int $start=0, int $end=25):array
+    {
+        $yy = floatval($dt->format('Y'));
 
-        $Y = $dt->format('Y');
-        if (false === $Y) return false;
-        $yy = floatval($Y);
+        if ($start < 0 || $start > 24 || $end < 1 || $end > 25) {
+            throw new Exception('The number of solar terms exceeds the limit');
+        };
 
-        if ($start < 0 || $start > 25 || $end < 0 || $end > 25) return false;
 
         $jq = [];
 
@@ -463,15 +475,17 @@ class Date
      * 求出以某年立春点开始的节(注意:为了方便计算起运数,此处第0位为上一年的小寒)
      *
      * @param DateTime $dt
-     * @return float[]|false
+     *
+     * @return float[]
+     * @throws Exception
      */
-    public static function pureJQsinceSpring(DateTime $dt) {
+    public static function pureJQsinceSpring(DateTime $dt):array
+    {
         $dtClone = clone $dt;
 
         $jdpjq = [];
 
         $dj = self::adjustedSolarTerms($dtClone->sub(new DateInterval('P1Y')), 19, 23); // 求出含指定年立春开始之3个节气JD值,以前一年的年值代入
-        if (false === $dj) return false;
 
         foreach ($dj as $k => $v){
             if($k < 19){
@@ -487,7 +501,6 @@ class Date
         }
 
         $dj = self::adjustedSolarTerms($dt, 0, 25); // 求出指定年节气之JD值,从春分开始,到大寒,多取两个确保覆盖一个公历年,也方便计算起运数
-        if (false === $dj) return false;
 
         foreach ($dj as $k => $v){
             if($k % 2 == 0){
@@ -503,22 +516,23 @@ class Date
      * 求出自冬至点为起点的连续15个中气
      *
      * @param DateTime $dt
-     * @return float[]|false
+     *
+     * @return float[]
+     * @throws Exception
      */
-    public static function zQsinceWinterSolstice(DateTime $dt) {
+    public static function zQsinceWinterSolstice(DateTime $dt):array
+    {
         $dtClone = clone $dt;
 
         $jdzq = [];
 
         $dj = self::adjustedSolarTerms($dtClone->sub(new DateInterval('P1Y')), 18, 23); // 求出指定年冬至开始之节气JD值,以前一年的值代入
-        if (false === $dj) return false;
 
         $jdzq[0] = $dj[18]; //冬至
         $jdzq[1] = $dj[20]; //大寒
         $jdzq[2] = $dj[22]; //雨水
 
         $dj = self::adjustedSolarTerms($dt, 0, 23); // 求出指定年节气之JD值
-        if (false === $dj) return false;
 
         foreach ($dj as $k => $v){
             if($k%2 != 0){
@@ -537,7 +551,8 @@ class Date
      * @param float $k
      * @return float
      */
-    public static function trueNewMoon(float $k):float {
+    public static function trueNewMoon(float $k):float
+    {
         $jdt = 2451550.09765 + $k * self::MEAN_LENGTH_OF_SYNODIC_MONTH;
         $t = ($jdt - 2451545) / 36525; // 2451545为2000年1月1日正午12时的JD
         $t2 = pow($t,2); // square for frequent use
@@ -605,7 +620,8 @@ class Date
      * @param float $jd
      * @return float[]
      */
-    public static function meanNewMoon(float $jd):array {
+    public static function meanNewMoon(float $jd):array
+    {
         // $kn为从2000年1月6日14时20分36秒起至指定年月日之阴历月数,以synodic month为单位
         $kn = floor(($jd - 2451550.09765) / self::MEAN_LENGTH_OF_SYNODIC_MONTH); // 2451550.09765为2000年1月6日14时20分36秒之JD值.
 
@@ -622,35 +638,28 @@ class Date
      *
      * @param DateTime $dt
      * @param float $jdws
-     * @return array|false
+     * @return array
      */
-    public static function sMsinceWinterSolstice(DateTime $dt, float $jdws) {
+    public static function sMsinceWinterSolstice(DateTime $dt, float $jdws):array
+    {
         // $dtClone = clone $dt;
         $Y = $dt->format('Y');
-        if (false === $Y) return false;
+
         $tz = $dt->getTimezone();
-        $dtOffset = $dt->getOffset();
         $ly = intval($Y,10) - 1;
 
-        try {
-            $dtlyNovember = new DateTime(strval($ly).'-11-01 00:00:00',$tz);
-        } catch (Exception $e) {
-            return false;
-        }
-
+        $dtlyNovember = new DateTime(strval($ly).'-11-01 00:00:00',$tz);
 
         $tjd = [];
 
         $jd = self::gregorianToJD($dtlyNovember); // 求年初前两个月附近的新月点(即前一年的11月初)
-        if (false === $jd) return false;
 
-        list($kn, $thejd) = self::meanNewMoon($jd); // 求得自2000年1月起第kn个平均朔望日及期JD值
+        [$kn, $thejd] = self::meanNewMoon($jd); // 求得自2000年1月起第kn个平均朔望日及期JD值
         for ($i = 0; $i <= 19; $i++) { // 求出连续20个朔望月
             $k = $kn + $i;
             // $mjd = $thejd + self::MEAN_LENGTH_OF_SYNODIC_MONTH * $i;
 
             $tjd[$i] = self::trueNewMoon($k) + 1 / 3; // 以k值代入求瞬时朔望日，因中国比格林威治先行8小时，加1/3天
-            //$tjd[$i] = self::trueNewMoon($k) + $dtOffset / 86400; // 以k值代入求瞬时朔望日，时区调整值表示天数(中国时区调整为28800，28800/86400 = 1/3)
 
             // 修正dynamical time to Universal time
             // 1为1月，0为前一年12月，-1为前一年11月(当i=0时，i-1代表前一年11月)
@@ -673,21 +682,19 @@ class Date
 
     /**
      * 以比较日期法求算冬月及其余各月名称代码,包含闰月,冬月为0,腊月为1,正月为2,其余类推.闰月多加0.5
+     *
      * @param DateTime $dt 日期，该方法只用到了年数
-     * @return false|array<array<float>,array<float>,array<float>> [以前一年冬至为起点之连续15个中气,以含冬至中气为阴历11月(冬月)开始的连续16个朔望月的新月点,月名称代码]
+     *
+     * @return array<array<float>,array<float>,array<float>> [以前一年冬至为起点之连续15个中气,以含冬至中气为阴历11月(冬月)开始的连续16个朔望月的新月点,月名称代码]
+     * @throws Exception
      */
-    public static function zQandSMandLunarMonthCode(DateTime $dt) {
+    public static function zQandSMandLunarMonthCode(DateTime $dt):array
+    {
         $mc = [];
 
         $jdzq = self::zQsinceWinterSolstice($dt); // 取得以前一年冬至为起点之连续15个中气
-        if (false === $jdzq) return false;
 
-        try {
-            $jdnm = self::sMsinceWinterSolstice($dt, $jdzq[0]); // 求出以含冬至中气为阴历11月(冬月)开始的连续16个朔望月的新月点
-        } catch (Exception $e) {
-            return false;
-        }
-        if (false === $jdnm) return false;
+        $jdnm = self::sMsinceWinterSolstice($dt, $jdzq[0]); // 求出以含冬至中气为阴历11月(冬月)开始的连续16个朔望月的新月点
 
         $yz = 0; // 设定旗标,0表示未遇到闰月,1表示已遇到闰月
         if (floor($jdzq[12] + 0.5) >= floor($jdnm[13] + 0.5)) { // 若第13个中气jdzq(12)大于或等于第14个新月jdnm(13)
@@ -739,22 +746,17 @@ class Date
     /**
      * 获取农历某年的闰月,0为无闰月
      *
-     * @param float $yy 农历年
+     * @param float       $yy       农历年
      * @param string|null $timeZone 时区
-     * @return false|int 闰几月，返回值是几就闰几月，0为无闰月
+     *
+     * @return int 闰几月，返回值是几就闰几月，0为无闰月
+     * @throws Exception
      */
-    public static function leap(float $yy, string $timeZone=null){
-        try {
-            $dt = new DateTime(strval($yy).'-01-01 12:00:00', $timeZone); // 实际使用格里历的年
-        } catch (Exception $e) {
-            return false;
-        }
+    public static function leap(float $yy, string $timeZone=null):int
+    {
+        $dt = new DateTime(strval($yy).'-01-01 12:00:00', $timeZone); // 实际使用格里历的年
 
-        try {
-            list(, , $mc) = self::zQandSMandLunarMonthCode($dt);
-        } catch (Exception $e) {
-            return false;
-        }
+        [, , $mc] = self::zQandSMandLunarMonthCode($dt);
 
         $leap = self::getLeap($mc);
 
@@ -763,31 +765,27 @@ class Date
 
     /**
      * 获取农历某个月有多少天
-     * @param float $yy 农历年数字
-     * @param float $mm 农历月数字
-     * @param int $isLeap 是否是闰月
+     *
+     * @param float       $yy       农历年数字
+     * @param float       $mm       农历月数字
+     * @param int         $isLeap   是否是闰月
      * @param string|null $timeZone 时区
-     * @return false|int 农历某个月天数
+     *
+     * @return int 农历某个月天数
+     * @throws Exception
      */
-    public static function lunarDays(float $yy, float $mm, int $isLeap=0, string $timeZone=null){
+    public static function lunarDays(float $yy, float $mm, int $isLeap=0, string $timeZone=null):int
+    {
         if ($yy < -1000 || $yy > 3000) { // 适用于公元-1000至公元3000,超出此范围误差较大
-            return false;
+            throw new Exception('Date not allowed');
         }
         if ($mm < 1 || $mm > 12){ // 月份须在1-12月之内
-            return false;
+            throw new Exception('Date not allowed');
         }
 
-        try {
-            $dt = new DateTime(strval($yy).'-01-01 12:00:00', $timeZone); // 实际使用格里历的年
-        } catch (Exception $e) {
-            return false;
-        }
+        $dt = new DateTime(strval($yy).'-01-01 12:00:00', $timeZone); // 实际使用格里历的年
 
-        try {
-            list(, $jdnm, $mc) = self::zQandSMandLunarMonthCode($dt);
-        } catch (Exception $e) {
-            return false;
-        }
+        [, $jdnm, $mc] = self::zQandSMandLunarMonthCode($dt);
 
         $leap = self::getLeap($mc);
 
@@ -803,10 +801,10 @@ class Date
 
         if ($isLeap){ // 闰月
             if ($leap < 3) { // 而旗标非闰月或非本年闰月,则表示此年不含闰月.leap=0代表无闰月,=1代表闰月为前一年的11月,=2代表闰月为前一年的12月
-                return false; // 该年非闰年
+                throw new InvalidArgumentException(sprintf('isLeap value "%d" is invalid.', (int)$leap)); // 该年不是闰年
             } else { // 若本年內有闰月
                 if ($leap != $mm) { // 但不为指定的月份
-                    return false; // 该月非该年的闰月，此月不是闰月
+                    throw new InvalidArgumentException(sprintf('the month value "%d" is invalid.', (int)$mm)); // 该月非该年的闰月，此月不是闰月
                 } else { // 若指定的月份即为闰月
                     $dy = $nofd[$mm];
                 }
@@ -825,38 +823,31 @@ class Date
 
     /**
      * 农历转格里历
-     * @param float $yy 农历年
-     * @param float $mm 农历月
-     * @param float $dd 农历日
-     * @param int $isLeap 指定的月是否是闰月
-     * @param string|null $timeZone 时区
-     * @return DateTime|false
+     *
+     * @param float       $yy       农历年
+     * @param float       $mm       农历月
+     * @param float       $dd       农历日
+     * @param int         $isLeap   指定的月是否是闰月
+     * @param DateTimeZone|null $timeZone 时区
+     *
+     * @return DateTime
+     * @throws Exception
      */
-    public static function lunarToGregorian(float $yy, float $mm, float $dd, int $isLeap=0, string $timeZone = null) {
-        if ($yy < -7000 || $yy > 7000) { //超出計算能力
-            return false;
+    public static function lunarToGregorian(float $yy, float $mm, float $dd, int $isLeap=0, DateTimeZone $timeZone = null):DateTime
+    {
+        if ($yy < -1000 || $yy > 3000) { //适用于公元-1000年至公元3000年,超出此范围误差较大
+            throw new Exception('Date not allowed');
         }
-        if ($yy < -1000 || $yy > 3000) { //适用于西元-1000年至西元3000年,超出此范围误差较大
-            return false;
+        if ($mm < 1 || $mm > 12){ //输入月份必须在1-12月之內
+            throw new Exception('Date not allowed');
         }
-        if ($mm < 1 || $mm > 12){ //輸入月份必須在1-12月之內
-            return false;
-        }
-        if ($dd < 1 || $dd > 30) { //輸入日期必須在1-30日之內
-            return false;
+        if ($dd < 1 || $dd > 30) { //输入日期必须在1-30日之內
+            throw new Exception('Date not allowed');
         }
 
-        try {
-            $dt = new DateTime(strval($yy).'-01-01 12:00:00', $timeZone); // 实际使用格里历的年
-        } catch (Exception $e) {
-            return false;
-        }
+        $dt = new DateTime(strval($yy).'-01-01 12:00:00', $timeZone); // 实际使用格里历的年
 
-        try {
-            list(, $jdnm, $mc) = self::zQandSMandLunarMonthCode($dt);
-        } catch (Exception $e) {
-            return false;
-        }
+        [, $jdnm, $mc] = self::zQandSMandLunarMonthCode($dt);
 
         $leap = self::getLeap($mc);
 
@@ -904,33 +895,32 @@ class Date
         // 去掉时分秒
         $jd = floor($jd) + 0.5;
 
-        return $er ? false : self::jdToGregorian($jd,$timeZone);
+        if(!$er){
+            return self::jdToGregorian($jd,$timeZone);
+        }else{
+            throw new InvalidArgumentException('An argument does not match with the expected value');
+        }
     }
 
     /**
      * 格里历日期转农历日期
+     *
      * @param DateTime $dt
-     * @return false|array
+     *
+     * @return array
+     * @throws Exception
      */
-    public static function gregorianToLunar(DateTime $dt) {
+    public static function gregorianToLunar(DateTime $dt):array {
 
         //$dtClone = clone $dt;
 
-        $YnjGis = $dt->format('Y,n,j,G,i,s');
-        if(false === $YnjGis){
-            return false;
-        }
-        list($yy,$mm,$dd,$hh,$ii,$ss) = array_map(function($v){return floatval($v);}, explode(',',$YnjGis,6));
+        $yy = floatval($dt->format('Y'));
 
 
         $prev = 0; // 是否跨年了,跨年了则减一
         $isLeap = (float)0;// 是否闰月
 
-        try {
-            list(, $jdnm, $mc) = self::zQandSMandLunarMonthCode($dt);
-        } catch (Exception $e) {
-            return false;
-        }
+        [, $jdnm, $mc] = self::zQandSMandLunarMonthCode($dt);
 
         $jd = self::gregorianToJD($dt); // 求出指定年月日之JD值
         $jda = $jd + 0.5; // 加0.5是将起始点从正午改为0时开始
@@ -939,11 +929,7 @@ class Date
             $prev = 1;
             $dtClone2 = clone $dt;
             $dtClone2->sub(new DateInterval('P1Y'));
-            try {
-                list(, $jdnm, $mc) = self::zQandSMandLunarMonthCode($dtClone2);
-            } catch (Exception $e) {
-                return false;
-            }
+            [, $jdnm, $mc] = self::zQandSMandLunarMonthCode($dtClone2);
         }
         for ($i = 0; $i <= 14; $i++) { // 指令中加0.5是为了改为从0时算起而不是从中午算起
             if (floor($jda) >= floor($jdnm[$i] + 0.5) && floor($jda) < floor($jdnm[$i + 1] + 0.5)) {
@@ -953,7 +939,7 @@ class Date
         }
 
         if ($mc[$mi] < 2 || $prev == 1) { // 年
-            $yy = $yy - 1;
+            $yy -= 1;
         }
 
         if (($mc[$mi] - floor($mc[$mi])) * 2 + 1 != 1) { // 因mc(mi)=0对应到前一年农历11月,mc(mi)=1对应到前一年农历12月,mc(mi)=2对应到本年1月,依此类推
@@ -971,15 +957,17 @@ class Date
      * 目的是取出当前格里历一年完整的节气
      *
      * @param DateTime $dt
-     * @return array|false
+     *
+     * @return array
+     * @throws Exception
      */
-    public static function solarTerms(DateTime $dt){
+    public static function solarTerms(DateTime $dt):array
+    {
         $dtClone = clone $dt;
 
         $jq = [];
 
         $dj = self::adjustedSolarTerms($dtClone->sub(new DateInterval('P1Y')), 18, 23);
-        if (false === $dj) return false;
 
         $jqnum = 0;
         foreach ($dj as $k => $v){
@@ -994,8 +982,7 @@ class Date
             $jqnum ++;
 
             $jqDt = self::jdToGregorian($dj[$k]);
-            if (false === $jqDt) continue;
-            list($y,$m,$d,$h,$i,$s) = explode(',',$jqDt->format('Y,n,j,G,i,s'),6);
+            [$y,$m,$d,$h,$i,$s] = explode(',',$jqDt->format('Y,n,j,G,i,s'),6);
             $jqdata['d'] = [
                 'y' => (int)$y,
                 'm' => (int)$m,
@@ -1009,15 +996,13 @@ class Date
         }
 
         $dj = self::adjustedSolarTerms($dt, 0, 19);
-        if (false === $dj) return false;
 
         foreach ($dj as $k => $v){
             $jqdata['i'] = ($jqnum + 18) % 24;
             $jqnum ++;
 
             $jqDt = self::jdToGregorian($dj[$k]);
-            if (false === $jqDt) continue;
-            list($y,$m,$d,$h,$i,$s) = explode(',',$jqDt->format('Y,n,j,G,i,s'),6);
+            [$y,$m,$d,$h,$i,$s] = explode(',',$jqDt->format('Y,n,j,G,i,s'),6);
             $jqdata['d'] = [
                 'y' => (int)$y,
                 'm' => (int)$m,
@@ -1037,32 +1022,32 @@ class Date
 
     /**
      * 四柱计算
+     *
      * @param DateTime $dt
-     * @return array|false
+     *
+     * @return array
+     * @throws Exception
      */
-    public static function sexagenaryCycle(DateTime $dt){
+    public static function sexagenaryCycle(DateTime $dt):array
+    {
         $dtClone = clone $dt;
         $dtNew = clone $dt;
 
         $YnjGis = $dt->format('Y,n,j,G,i,s');
         if(false === $YnjGis){
-            $YnjGis = '-4712,1,1,12,0,0';
+            $YnjGis = '1582,10,15,12,0,0';
         }
-        list($yy,$m,$d,$hh,$i,$s) = array_map(function($v){return intval($v,10);}, explode(',',$YnjGis,6));
+        [$yy,$m,$d,$hh,$i,$s] = array_map(function($v){return intval($v,10);}, explode(',',$YnjGis,6));
 
         $jd = self::gregorianToJD($dtClone->add(new DateInterval('PT1S')));
-        if(false === $jd) return false;
 
         $gz = [];
-        // $tg = $dz = array();
 
         $jq = self::pureJQsinceSpring($dt); // 取得自立春开始的节(不包含中气)，该数组长度固定为16
-        if(false === $jq) return false;
 
         if ($jd < $jq[1]) { // jq[1]为立春，约在2月5日前后。
             $yy = $yy - 1; // 若小于jq[1]则属于前一个节气年
             $jq = self::pureJQsinceSpring($dtClone->sub(new DateInterval('P1Y'))); // 取得自立春开始的节(不包含中气)，该数组长度固定为16
-            if(false === $jq) return false;
         }
 
         $ygz = (($yy + 4712 + 24) % 60 + 60) % 60;
@@ -1081,7 +1066,7 @@ class Date
         $gz['m']['g'] = $mgz % 10; // 月干
         $gz['m']['z'] = $mgz % 12; // 月支
 
-        $jda = $jd + 0.5; // 计算日柱之干支，加0.5是将起始点从正午改为0时开始
+        $jda = $jd + 0.5; // 计算日柱的干支，加0.5是将起始点从正午改为0时开始
         $thes = (($jda - floor($jda)) * 86400) + 3600; // 将jd的小数部分化为秒，并加上起始点前移的一小时(3600秒)
         $dayjd = floor($jda) + $thes / 86400; // 将秒数化为日数，加回到jd的整数部分
         $dgz = (floor($dayjd + 49) % 60 + 60) % 60;
@@ -1092,10 +1077,10 @@ class Date
             $gz['d']['z'] = ($gz['d']['z'] + 12 - 1) % 12;
         }
 
-        $dh = $dayjd * 12; //計算時柱之干支
+        $dh = $dayjd * 12; // 计算时柱的干支
         $hgz = (floor($dh + 48) % 60 + 60) % 60;
-        $gz['h']['g'] = $hgz % 10; //時干
-        $gz['h']['z'] = $hgz % 12; //時支
+        $gz['h']['g'] = $hgz % 10; // 时干
+        $gz['h']['z'] = $hgz % 12; // 时支
 
         return $gz;
     }
@@ -1103,16 +1088,15 @@ class Date
     /**
      * 星座索引
      * @param DateTime $dt
-     * @return false|int
+     * @return int
      */
-    public static function zodiac(DateTime $dt) {
+    public static function zodiac(DateTime $dt):int
+    {
         $nj = $dt->format('n,j'); // 星座只要知道月和日就行了
-        if(false === $nj){
-            return false;
-        }
-        list($mm,$dd) = array_map(function($v){return intval($v,10);}, explode(',',$nj,2));
 
-        $dds = array(20,19,21,20,21,22,23,23,23,24,22,22); //星座的起始日期
+        [$mm,$dd] = array_map(function($v){return intval($v,10);}, explode(',',$nj,2));
+
+        $dds = [20,19,21,20,21,22,23,23,23,24,22,22]; //星座的起始日期
 
         $kn = $mm - 1; //下标从0开始
 
@@ -1122,9 +1106,5 @@ class Date
 
         return (int)$kn;
     }
-
-
-
-
 
 }

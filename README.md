@@ -1,5 +1,6 @@
 # php-calendar
 a php calendar api 一个用php写的日历
+有节气、农历、干支、星座等
 
 ## INSTALL 按装
 
@@ -9,21 +10,40 @@ a php calendar api 一个用php写的日历
 composer require phpu/calendar
 ```
 
-## DEMO 简单例子
+## DEMO 1 简单例子2(一个完整的日历数据)
 
 ```
-$Calendar = new Calendar();
-var_dump($cd->getCalendar(2020,1,30));
+// $Calendar = new \phpu\calendar\Calendar(new DateTimeZone('Asia/Shanghai'),'default'); // 自定义时区和配置项
+$Calendar = new Calendar(); // 默认系统时区，默认配置项
+var_dump($Calendar->getCalendar(2020,1,30));
+// 如需json输出，可以直接将数组转成json
+// echo json_encode($Calendar->getCalendar(2020,1,30));
 
 ```
+
+## DEMO 2 简单例子2(公历转农历)
+
+```
+lunar = \phpu\calendar\Date::gregorianToLunar(new DateTime('2020-1-30'));
+var_dump($lunar);
+```
+
+## DEMO 3 简单例子3(农历转公历)
+
+```
+$gregorian = \phpu\calendar\Date::lunarToGregorian(2020, 1, 6, 0, new DateTimeZone('Asia/Shanghai'));
+var_dump($gregorian);
+```
+
+其它更多的功能请参看源代码。
 
 ### config 配置
 ```
 // 读取日历长度
-        // 0 GRIDo_MONTH 一个月
-        // 1 GRIDo_WEEK 一周
-        // 2 GRIDo_DAY 一天
-        'grid' => \phpu\calendar\Calendar::GRIDo_MONTH,
+        // 0 GRIDO_MONTH 一个月
+        // 1 GRIDO_WEEK 一周
+        // 2 GRIDO_DAY 一天
+        'grid' => \phpu\calendar\Calendar::GRIDO_MONTH,
 
         // 读取节气
         'solar_terms' => true,

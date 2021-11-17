@@ -514,6 +514,27 @@ class ChineseCalendar
         return $gz;
     }
 
+    /**
+     * 星座索引
+     *
+     * @param int $month 月
+     * @param int $day   日
+     *
+     * @return int 星座索引值
+     */
+    public static function signIndex(int $month, int $day):int
+    {
+        $dds = [20,19,21,20,21,22,23,23,23,24,22,22]; //星座的起始日期
+
+        $kn = $month - 1; //下标从0开始
+
+        if ($day < $dds[$kn]){ //如果早于该星座起始日期,则往前一个
+            $kn = (($kn + 12) - 1) % 12; //确保是正数
+        }
+
+        return (int)$kn;
+    }
+
 
 
 }

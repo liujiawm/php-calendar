@@ -1,32 +1,42 @@
-# wms-calendar
+# 日历
 
-calendar, 日历, 中国农历, 阴历, 节气, 干支, 生肖, 星座
-
-日曆, 中國農曆, 陰曆, 節氣
+calendar、日历、中国农历、阴历、节气、干支、生肖、星座
 
 通过天文计算和民间推算方法，准确计算出公历-1000年至3000年的农历、干支、节气等，同时支持多配置、多语言、多时区。
 
-* 农历计算准确
-* 节气误差在1分钟之内
-* 干支计算准确
-  * 干支年以立春开始
-  * 干支月以节分隔
-  * 干支日可以设置是否区早晚子时
-  * 干支时从上一天的23点开始。
+* 干支年以立春开始
+* 干支月以节分隔
+* 干支日可以设置是否区早晚子时
+* 干支时从上一天的23点开始。
+
 
 > 天文计算方法参考Jean Meeus的《Astronomical Algorithms》、[NASA](https://eclipse.gsfc.nasa.gov/SEhelp/deltatpoly2004.html "NASA")网站、[天文与历法](http://www.bieyu.com/ "天文与历法")网站等相关的天文历法计算方法。
 
 > 注意：该程序视UT = UTC
 
 
-## INSTALL 安装 ##
+- [Installation 安装](#installation-安装)
+- [示例](#示例)
+  - [日历](#日历)
+  - [日历配置](#日历配置)
+  - [儒略日与公历互换](#儒略日与公历互换)
+  - [节气](#节气)
+  - [农历与公历互换](#农历与公历互换)
+  - [公历转换干支生肖](#公历转换干支生肖)
+  - [星座](#星座)
+- [帮助](https://github.com/liujiawm/php-calendar)
+- 联系
+  - QQ:194088
+  - Email:liujiawm@msn.com
+
+## Installation 安装 ##
 
 ```
 composer require phpu/calendar
 ```
 
 
-## Demos 示例 ##
+## 示例 ##
 
 ### 日历 ###
 
@@ -413,10 +423,24 @@ $month = 5;
 $day = 26;
 $hours = 19;
 $scs = \phpu\calendar\ChineseCalendar::sexagenaryCycle($year, $month, $day, $hours);
-printf("%d年%d月%d日%d时的干支是: %s%s(%s)年 %s%s月 %s%s日 %s%s时",$year,$month,$day,$hours,
+printf("%d年%d月%d日%d时的干支是: %s%s(%s)年 %s%s月 %s%s日 %s%s时 \n",$year,$month,$day,$hours,
     $heavenly_stems[$scs['y']['g']],$earthly_branches[$scs['y']['z']],$symbolic_animals[$scs['y']['z']],
     $heavenly_stems[$scs['m']['g']],$earthly_branches[$scs['m']['z']],
     $heavenly_stems[$scs['d']['g']],$earthly_branches[$scs['d']['z']],
     $heavenly_stems[$scs['h']['g']],$earthly_branches[$scs['h']['z']]);
+```
+
+### 星座 ###
+
+```
+5月26日出生 属双子座
+```
+
+```
+$month = 5;
+$day = 26;
+$star_sign = ['水瓶', '双鱼', '白羊', '金牛', '双子', '巨蟹', '狮子', '处女', '天秤', '天蝎', '射手', '摩羯'];
+$signIndex = \phpu\calendar\ChineseCalendar::signIndex($month, $day);
+printf("%d月%d日出生 属%s座", $month, $day, $star_sign[$signIndex]);
 ```
 

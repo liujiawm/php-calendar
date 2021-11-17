@@ -559,31 +559,12 @@ class Calendar
         // 星座只要知道月和日就行了
         [$month,$day] = array_map(function($v){return intval($v,10);}, explode(',',$dateTime->format('n,j'),2));
 
-        $i = self::signIndex($month,$day);
+        $i = ChineseCalendar::signIndex($month,$day);
 
         return [$i, ($this->lang['star_sign'])[$i]];
     }
 
-    /**
-     * 星座索引
-     *
-     * @param int $month 月
-     * @param int $day   日
-     *
-     * @return int 星座索引值
-     */
-    private static function signIndex(int $month, int $day):int
-    {
-        $dds = [20,19,21,20,21,22,23,23,23,24,22,22]; //星座的起始日期
 
-        $kn = $month - 1; //下标从0开始
-
-        if ($day < $dds[$kn]){ //如果早于该星座起始日期,则往前一个
-            $kn = (($kn + 12) - 1) % 12; //确保是正数
-        }
-
-        return (int)$kn;
-    }
 
     /**
      * 农历月份数转中文表示

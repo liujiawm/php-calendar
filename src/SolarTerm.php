@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace phpu\calendar;
 
+use \Exception;
+
 /**
  * 节气相关
  *
@@ -13,6 +15,12 @@ namespace phpu\calendar;
  */
 class SolarTerm
 {
+    /**
+     * 指定年份以春分开始的节气
+     *
+     * @var array  以年份数为索引的节气数组
+     */
+    private static $msts = [];
 
     /**
      * 从上一年的冬至开始到下一年的小寒共26个节气对应的日期时间，
@@ -22,7 +30,7 @@ class SolarTerm
      * @param string $timeZoneName 时区名称 默认: 'Asia/Shanghai' (亚洲/上海，中国北京时间)
      *
      * @return array array[26][array['i'=>int节气名称索引,'d'=>DateTime节气对应的日期时间]]
-     * @throws \Exception
+     * @throws Exception
      */
     public static function solarTerms(int $year, string $timeZoneName = 'Asia/Shanghai' ):array
     {
@@ -70,8 +78,6 @@ class SolarTerm
         return $jq;
     }
 
-
-
     /**
      * 获取指定年以春分开始的节气,
      * 经过摄动值和deltaT调整后的jd
@@ -84,8 +90,12 @@ class SolarTerm
      */
     public static function adjustedSolarTerms(int $year, int $start=0, int $end=25):array
     {
-
-        $mst = Astronomy::meanSolarTerms($year);
+        if(isset(self::$msts[$year])){
+            $mst = self::$msts[$year];
+        }else{
+            $mst = Astronomy::meanSolarTerms($year);
+            self::$msts[$year] = $mst;
+        }
 
         $jq = [];
         foreach ($mst as $i => $jd){

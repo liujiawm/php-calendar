@@ -204,7 +204,7 @@ $calendar = $Calendar->setLang('zh-tw')->setTimeZone('Asia/Shanghai')->createCal
 
 `Julian`
 
-儒略日转换为公历日期时间(UT):
+儒略日转换为日期时间(TT):
 
 ```
 // Julian::julianDay参数(int年,int月=1,int日=1,int时=12,int分=0,int秒=0,int毫秒=0)
@@ -212,7 +212,7 @@ $jd = phpu\calendar\Julian::julianDay(2011,8,9,5,24,35);
 var_dump($jd);
 ```
 
-公历日期时间(UT)转换为儒略日:
+日期时间(TT)转换为儒略日:
 
 ```
 $jd = 2455782.7254051;
@@ -232,10 +232,11 @@ print $dateTime->format(\DateTimeInterface::RFC3339)
 
 简化儒略日MJD
 
-> 简化儒略日计算1858年11月16日之后的日期
+> 简化儒略日计算1858年11月16日午夜之后的日期
 
 ```
 // 日期直接转换成简化儒略日
+// 如果日期在1858年11月17日凌晨之前，则返回0
 $mjd = phpu\calendar\Julian::modifiedJulianDay(2011,8,9,5,24,35);
 print $mjd;
 
@@ -244,6 +245,143 @@ print "\n";
 // 简化儒略日转儒略日
 $jd = phpu\calendar\Julian::mjdTojulianDay($mjd);
 print $jd;
+
+```
+
+### 节气 ###
+
+`SolarTerm`
+
+显示一整年的节气，同时显示上一年最后一个气(冬至)和下一年第一个节(小寒)
+
+如2021年全年节气显示如下:
+
+```
+冬至: 2020-12-21T18:02:36+08:00 
+小寒: 2021-01-05T11:23:50+08:00 
+大寒: 2021-01-20T04:40:31+08:00 
+立春: 2021-02-03T22:59:23+08:00 
+雨水: 2021-02-18T18:44:29+08:00 
+惊蛰: 2021-03-05T16:53:57+08:00 
+春分: 2021-03-20T17:37:28+08:00 
+清明: 2021-04-04T21:34:48+08:00 
+谷雨: 2021-04-20T04:32:43+08:00 
+立夏: 2021-05-05T14:46:29+08:00 
+小满: 2021-05-21T03:36:22+08:00 
+芒种: 2021-06-05T18:51:32+08:00 
+夏至: 2021-06-21T11:31:47+08:00 
+小暑: 2021-07-07T05:05:28+08:00 
+大暑: 2021-07-22T22:26:42+08:00 
+立秋: 2021-08-07T14:54:28+08:00 
+处暑: 2021-08-23T05:35:23+08:00 
+白露: 2021-09-07T17:53:16+08:00 
+秋分: 2021-09-23T03:20:56+08:00 
+寒露: 2021-10-08T09:38:45+08:00 
+霜降: 2021-10-23T12:50:30+08:00 
+立冬: 2021-11-07T12:58:14+08:00 
+小雪: 2021-11-22T10:33:05+08:00 
+大雪: 2021-12-07T05:56:49+08:00 
+冬至: 2021-12-21T23:59:05+08:00 
+小寒: 2022-01-05T17:14:07+08:00 
+
+```
+取节气测试代码:
+
+```
+$st_names = ['春分', '清明', '谷雨', '立夏', '小满', '芒种', '夏至', '小暑', '大暑', '立秋', '处暑', '白露',
+                          '秋分', '寒露', '霜降', '立冬', '小雪', '大雪', '冬至', '小寒', '大寒', '立春', '雨水', '惊蛰'];
+
+// 该方法第二个参数为时区名称，默认为: 'Asia/Shanghai'
+$sts = phpu\calendar\SolarTerm::solarTerms(2021);
+
+foreach ($sts as $stv){
+    printf("%s: %s \n", $st_names[$stv['i']], $stv['d']->format(\DateTimeInterface::RFC3339));
+}
+
+```
+
+### 农历与公历互换 ###
+
+
+```
+$year = 2020;
+$month = 5;
+$day = 26;
+
+$lunarDateArray = ChineseCalendar::gregorianToLunar($year,$month,$day);
+$leapstr = $lunarDateArray['leap'] === 1 ? '(闰)' : '';
+printf("公历 %'.04d-%'.02d-%'.02d 是农历: %'.04d年 %s%d月 %d日 \n", $year, $month, $day, $lunarDateArray['Y'], $leapstr,$lunarDateArray['n'],$lunarDateArray['j']);
+print "\n";
+
+// 默认时区: 'Asia/Shanghai'
+$gdate = \phpu\calendar\ChineseCalendar::lunarToGregorian($lunarDateArray['Y'],$lunarDateArray['n'],$lunarDateArray['j'],$lunarDateArray['leap']);
+print '农历'.$lunarDateArray['Y'].'年'.$leapstr.$lunarDateArray['n'].'月'.$lunarDateArray['j'].'是公历' . ': ' . $gdate->format('Y-m-d') ."\n";
+print "\n";
+
+```
+
+农历中文数字表示可以参考以下两个函数
+
+以下两个函数在`Calendar`类中作为私有方法存在，因此在日历显示时会根据语言自动转换
+
+```
+/**
+ * 农历月份数转中文表示
+ *
+ * @param int $month  农历月份数
+ * @param int $isLeap 是否闰月
+ *
+ * @return string
+ */
+function lunarMonthChinese(int $month, int $isLeap = 0):string
+{
+    $lunar_leap = '(闰)';
+    $lunar_months = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+    
+    if($month < 1 || $month > 12){
+        return '';
+    }
+
+    $leapstr = $isLeap ? $lunar_leap : '';
+
+    return $leapstr . $lunar_months[$month - 1];
+}
+
+/**
+ * 农历日数字转中文表示
+ *
+ * @param int $day 农历的日数
+ *
+ * @return string 中文表示法 如：初五，初十，二十，廿五
+ */
+function lunarDayChinese(int $day):string
+{
+    $lunar_number = ['日', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    $lunar_whole_tens = ['初', '十', '廿'];
+    
+    
+    // 农历每月的天数不能超过30
+    if ($day < 1 || $day > 30){
+        return '';
+    }
+
+    $daystr = '';
+
+    switch ($day){
+        case 10 : $daystr = $lunar_whole_tens[0] . $lunar_number[10]; // 初十
+            break;
+        case 20 : $daystr = $lunar_number[2] . $lunar_number[10];     // 二十
+            break;
+        case 30 : $daystr = $lunar_number[3] . $lunar_number[10];     // 三十
+            break;
+        default:
+            $k = $day / 10;
+            $m = $day % 10;
+            $daystr = $lunar_whole_tens[$k] . $lunar_number[$m];
+    }
+
+    return $daystr;
+}
 
 ```
 

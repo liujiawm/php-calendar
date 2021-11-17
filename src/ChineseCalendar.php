@@ -30,7 +30,15 @@ class ChineseCalendar
      *
      * @var array [int年份数 => array[16]float]
      */
-    private static $jss = [];
+    private static $jsses = [];
+
+
+    /**
+     * 以前一年冬至为起点之连续16个中气
+     *
+     * @var array  [int年份数 => array[16]float]
+     */
+    private static $zqs = [];
 
 
     /**
@@ -262,7 +270,8 @@ class ChineseCalendar
     {
         $mc = [];
 
-        $zq = self::qiSinceWinterSolstice($year); // 取得以前一年冬至为起点之连续15个中气
+        // 取得以前一年冬至为起点之连续16个中气
+        $zq = self::qiSinceWinterSolstice($year);
 
         $nm = self::sMsinceWinterSolstice($year, $zq[0]); // 求出以含冬至中气为阴历11月(冬月)开始的连续16个朔望月的新月点
 
@@ -367,12 +376,16 @@ class ChineseCalendar
      */
     private static function pureJieSinceSpring(int $year):array
     {
-        $jdpjq = [];
+        if(isset(self::$jsses[$year])){
+            return self::$jsses[$year];
+        }
+
+        $jss = [];
 
         $lastYearAsts = SolarTerm::lastYearSolarTerms($year);
         for ($i=19;$i<=23;$i++){
             if($i%2 == 0)continue;
-            $jdpjq[] = $lastYearAsts[$i] + self::CHINESE_TIME_OFFSET; // 农历计算需要，加上中国(东八区)时差
+            $jss[] = $lastYearAsts[$i] + self::CHINESE_TIME_OFFSET; // 农历计算需要，加上中国(东八区)时差
         }
 
         // $jdpjq[0] = $lastYearAsts[19] + self::CHINESE_TIME_OFFSET; // 19小寒
@@ -385,10 +398,12 @@ class ChineseCalendar
             if($k % 2 == 0){
                 continue;
             }
-            $jdpjq[] = $asts[$k] + self::CHINESE_TIME_OFFSET; // 农历计算需要，加上中国(东八区)时差
+            $jss[] = $asts[$k] + self::CHINESE_TIME_OFFSET; // 农历计算需要，加上中国(东八区)时差
         }
 
-        return $jdpjq;
+        self::$jsses[$year] = $jss;
+
+        return $jss;
     }
 
     /**
@@ -400,6 +415,10 @@ class ChineseCalendar
      */
     private static function qiSinceWinterSolstice(int $year):array
     {
+        if(isset(self::$zqs[$year])){
+            return self::$zqs[$year];
+        }
+
         $zq = [];
 
         $lastYearAsts = SolarTerm::lastYearSolarTerms($year);
@@ -412,7 +431,7 @@ class ChineseCalendar
         // $zq[1] = $lastYearAsts[20] + self::CHINESE_TIME_OFFSET; // 大寒
         // $zq[2] = $lastYearAsts[22] + self::CHINESE_TIME_OFFSET; // 雨水
 
-        $asts = SolarTerm::adjustedSolarTerms($year, 0, 26); // 求出指定年节气之JD值
+        $asts = SolarTerm::adjustedSolarTerms($year, 0, 25); // 求出指定年节气之JD值
 
         foreach ($asts as $k => $v){
             if($k%2 != 0){
@@ -420,6 +439,8 @@ class ChineseCalendar
             }
             $zq[] = $asts[$k] + self::CHINESE_TIME_OFFSET; // 农历计算需要，加上中国(东八区)时差
         }
+
+        self::$zqs[$year] = $zq;
 
         return $zq;
     }
@@ -446,17 +467,15 @@ class ChineseCalendar
         $gz = [];
 
         // 取得自立春开始的节(不包含中气)，该数组长度固定为16
-        $jss = !isset(self::$jss[$year]) ? self::pureJieSinceSpring($year) : self::$jss[$year];
+        $jss = self::pureJieSinceSpring($year);
 
         // 以立春当天0时作比较，不考虑定立春的时分秒，所以用floor取整数部分
         if (floor($jd + 0.5) < floor($jss[1] + 0.5)) { // $jss[1]为立春，约在2月5日前后。
             $year -= 1; // 若小于$jss[1]则属于前一个节气年
 
             // 取得自立春开始的节(不包含中气)，该数组长度固定为16
-            $jss = !isset(self::$jss[$year]) ? self::pureJieSinceSpring($year) : self::$jss[$year];
+            $jss = self::pureJieSinceSpring($year);
         }
-
-        self::$jss[$year] = $jss; // 按年取节后放入$jss，避免重复取同一年的节
 
         $ygz = (($year + 4712 + 24) % 60 + 60) % 60;
         $gz['y']['g'] = $ygz % 10; //年干

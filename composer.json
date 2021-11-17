@@ -1,6 +1,6 @@
 {
 	"name" : "phpu/calendar",
-	"description" : "a php calendar api 一个用php写的日历",
+	"description" : "中国日历，通过天文计算和民间推算方法，准确计算出公历-1000年至3000年的农历、干支、节气等，同时支持多配置、多语言、多时区。",
 	"keywords" : [
 		"calendar",
 		"julian day",
@@ -11,7 +11,18 @@
 		"heavenly stems",
 		"earthly branches",
 		"symbolic_animals",
-		"zodiac"
+		"zodiac",
+		"日历",
+		"中国农历",
+		"阴历",
+		"节气",
+		"干支",
+		"生肖",
+		"星座",
+		"日曆",
+		"中國農曆",
+		"陰曆",
+		"節氣"
 	],
 	"authors": [
 	{

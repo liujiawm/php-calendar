@@ -12,7 +12,6 @@ calendar、日历、中国农历、阴历、节气、干支、生肖、星座
 
 > 天文计算方法参考Jean Meeus的《Astronomical Algorithms》、[NASA](https://eclipse.gsfc.nasa.gov/SEhelp/deltatpoly2004.html "NASA")网站、[天文与历法](http://www.bieyu.com/ "天文与历法")网站等相关的天文历法计算方法。
 
-> 注意：该程序视UT = UTC
 
 
 - [Installation 安装](#installation-安装)

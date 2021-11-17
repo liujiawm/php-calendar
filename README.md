@@ -19,7 +19,14 @@ calendar, 日历, 中国农历, 阴历, 节气, 干支, 生肖, 星座
 > 注意：该程序视UT = UTC
 
 
-## Demos ##
+## INSTALL 安装 ##
+
+```
+composer require phpu/calendar
+```
+
+
+## Demos 示例 ##
 
 ### 日历 ###
 
@@ -89,7 +96,7 @@ $current_gregorian_str = $calendar['w'] . ' ' . $calendar['y'] . '-' . $calendar
 
 $current_jq_str = !empty($calendar['solar_terms']) ? ' 节气:' . $calendar['solar_terms'][0] . ' 定:' . $calendar['solar_terms'][1] : '';
 
-$current_gz_str = !empty($calendar['gz']) ? $calendar['gz']['y'] . '年'.$calendar['gz']['m'] . '月'.$calendar['gz']['d'] . '日' : '';
+$current_gz_str = !empty($calendar['gz']) ? $calendar['gz']['y']['s'] . '年'.$calendar['gz']['m']['s'] . '月'.$calendar['gz']['d']['s'] . '日' : '';
 
 $current_lunar_str = !empty($calendar['lunar']) ? $calendar['lunar'][0] . '年' . $calendar['lunar'][1] . $calendar['lunar'][2] : '';
 
@@ -111,7 +118,7 @@ foreach ($calendar['days'] as [$k,$day]){
     $jq_str = (isset($day['solar_terms']) && isset($day['solar_terms'][$k])) ? ' 节气:' . $day['solar_terms'][$k][0] . ' 定:' . $day['solar_terms'][$k][1] : '';
 
     // 干支
-    $gz_str = !empty($day['gz']) ? $day['gz']['y'] . '年' . $day['gz']['m'] . '月' . $day['gz']['d'] . '日' : '';
+    $gz_str = !empty($day['gz']) ? $day['gz']['y']['s'] . '年' . $day['gz']['m']['s'] . '月' . $day['gz']['d']['s'] . '日' : '';
 
     // 农历
     $lunar_str = !empty($day['lunar']) ? $day['lunar'][0] . '年' . $day['lunar'][1] . $day['lunar'][2] : '';
@@ -302,6 +309,13 @@ foreach ($sts as $stv){
 
 ### 农历与公历互换 ###
 
+[农历中文数字表示参考下面的两个函数](#农历中文数字表示可以参考以下两个函数)
+
+```
+公历 2020-05-26 是农历: 2020年 (闰)4月 4日 
+
+农历2020年(闰)4月4是公历: 2020-05-26
+```
 
 ```
 $year = 2020;
@@ -320,7 +334,7 @@ print "\n";
 
 ```
 
-农历中文数字表示可以参考以下两个函数
+### 农历中文数字表示可以参考以下两个函数 ###
 
 以下两个函数在`Calendar`类中作为私有方法存在，因此在日历显示时会根据语言自动转换
 
@@ -383,5 +397,26 @@ function lunarDayChinese(int $day):string
     return $daystr;
 }
 
+```
+
+### 公历转换干支生肖 ###
+
+> 生肖依地支为引索
+
+```
+2020年5月26日19时的干支是: 庚子(鼠)年 辛巳月 己巳日 甲戌时
+```
+
+```
+$year = 2020;
+$month = 5;
+$day = 26;
+$hours = 19;
+$scs = \phpu\calendar\ChineseCalendar::sexagenaryCycle($year, $month, $day, $hours);
+printf("%d年%d月%d日%d时的干支是: %s%s(%s)年 %s%s月 %s%s日 %s%s时",$year,$month,$day,$hours,
+    $heavenly_stems[$scs['y']['g']],$earthly_branches[$scs['y']['z']],$symbolic_animals[$scs['y']['z']],
+    $heavenly_stems[$scs['m']['g']],$earthly_branches[$scs['m']['z']],
+    $heavenly_stems[$scs['d']['g']],$earthly_branches[$scs['d']['z']],
+    $heavenly_stems[$scs['h']['g']],$earthly_branches[$scs['h']['z']]);
 ```
 

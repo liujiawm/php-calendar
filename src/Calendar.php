@@ -499,10 +499,11 @@ class Calendar
     /**
      * 取干支
      * 依公历日期时间取干支,
+     * 生肖依地支索引
      *
      * @param DateTime $dateTime
      *
-     * @return string[]
+     * @return string[] ['y'=>['s'=>string年干支名称,‘sa’=>string年生肖,'g'=>int年干索引,'z'=>int年支索引], ['m'=>['s','sa','g','z']], ['d'=>['s','sa','g','z']], ['h'=>['s','sa','g','z']]]
      */
     public function sexagenaryCycle(DateTime $dateTime):array
     {
@@ -512,14 +513,16 @@ class Calendar
 
         $scs = ChineseCalendar::sexagenaryCycle($year,$month,$day,$hours,$minutes,$seconds, $this->config['night_zi_hour']);
 
-        $lang_hs_strings = ($this->lang)['heavenly_stems'];
-        $lang_eb_strings = ($this->lang)['earthly_branches'];
+        $lang_hs_strings = ($this->lang)['heavenly_stems'];   // 天干
+        $lang_eb_strings = ($this->lang)['earthly_branches']; // 地支
+        $lang_sa_strings = ($this->lang)['symbolic_animals']; // 生肖
+
 
         return [
-            'y' => $lang_hs_strings[$scs['y']['g']].$lang_eb_strings[$scs['y']['z']],
-            'm' => $lang_hs_strings[$scs['m']['g']].$lang_eb_strings[$scs['m']['z']],
-            'd' => $lang_hs_strings[$scs['d']['g']].$lang_eb_strings[$scs['d']['z']],
-            'h' => $lang_hs_strings[$scs['h']['g']].$lang_eb_strings[$scs['h']['z']]
+            'y' => ['s'=>$lang_hs_strings[$scs['y']['g']].$lang_eb_strings[$scs['y']['z']], 'sa'=>$lang_sa_strings[$scs['y']['z']], 'g'=>$scs['y']['g'], 'z'=>$scs['y']['z']],
+            'm' => ['s'=>$lang_hs_strings[$scs['m']['g']].$lang_eb_strings[$scs['m']['z']], 'sa'=>$lang_sa_strings[$scs['m']['z']], 'g'=>$scs['m']['g'], 'z'=>$scs['m']['z']],
+            'd' => ['s'=>$lang_hs_strings[$scs['d']['g']].$lang_eb_strings[$scs['d']['z']], 'sa'=>$lang_sa_strings[$scs['d']['z']], 'g'=>$scs['d']['g'], 'z'=>$scs['d']['z']],
+            'h' => ['s'=>$lang_hs_strings[$scs['h']['g']].$lang_eb_strings[$scs['h']['z']], 'sa'=>$lang_sa_strings[$scs['h']['z']], 'g'=>$scs['h']['g'], 'z'=>$scs['h']['z']],
         ];
     }
 

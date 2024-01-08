@@ -609,7 +609,7 @@ class Calendar
             case 30 : $daystr = ($this->lang['lunar_number'])[3] . ($this->lang['lunar_number'])[10];     // 三十
                 break;
             default:
-                $k = $day / 10;
+                $k = floor($day / 10);
                 $m = $day % 10;
                 $daystr = ($this->lang['lunar_whole_tens'])[$k] . ($this->lang['lunar_number'])[$m];
         }
